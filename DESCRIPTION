@@ -28,6 +28,7 @@ Imports:
     glmnet,
     stats
 Suggests:
+    haven,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)

@@ -186,26 +186,40 @@ test_that("an empty level-by-arm cell warns and names the cell", {
   expect_true("X_fac" %in% all.vars(sel))
 })
 
-test_that("a redundant covariate is named, with a paste-ready exclusion", {
-  set.seed(5)
+test_that("multi-arm treatments select per arm and fit", {
+  # meta_propaganda has three- and four-arm designs; the per-arm outcome loop
+  # runs once per arm, so this exercises a path two-arm tests never reach.
+  set.seed(31)
   n <- 600
-  educ <- factor(sample(c("hs", "college", "postgrad"), n, replace = TRUE))
-  dat <- data.frame(
-    Z = rep(0:1, n / 2),
-    X_educ = educ,
-    X_college = as.integer(educ %in% c("college", "postgrad")),  # nested in X_educ
-    X_sig = rnorm(n)
+  d <- data.frame(
+    Z = factor(rep(c("C", "T1", "T2"), each = n / 3)),
+    X_sig = rnorm(n), X_noise = rnorm(n)
   )
-  dat$Y <- 0.4 * dat$Z + 2 * dat$X_sig + 1.2 * dat$X_college + rnorm(n)
+  d$Y <- 0.3 * (d$Z == "T1") + 0.6 * (d$Z == "T2") + 2 * d$X_sig + rnorm(n)
 
-  w <- tryCatch(lasso_select_covariates(Y ~ Z, ~ X_educ + X_college + X_sig, data = dat),
-                warning = function(x) conditionMessage(x))
-  if (is.character(w)) {
-    expect_match(w, "redundancy")
-    expect_match(w, "covariates = c\\(")
-  } else {
-    succeed("design was full rank for this draw")
-  }
+  sel <- lasso_select_covariates(Y ~ Z, ~ X_sig + X_noise, data = d)
+  expect_true("X_sig" %in% all.vars(sel))
+  expect_false("X_noise" %in% all.vars(sel))
+})
+
+test_that("a covariate observed in only one arm is still handled end to end", {
+  # The deryugina and allen shapes met in the wild, run through the whole
+  # pipeline rather than the selector alone: a usable estimate must come back.
+  set.seed(32)
+  n <- 400
+  d <- data.frame(
+    Z = rep(0:1, each = n / 2),
+    X_sig = rnorm(n),
+    X_fac = factor(c(sample(c("a", "b"), n / 2, replace = TRUE),
+                     sample(c("a", "b", "c"), n / 2, replace = TRUE)))
+  )
+  d$Y <- 0.5 * d$Z + 2 * d$X_sig + rnorm(n)
+
+  fit <- suppressWarnings(lm_lin_lasso(Y ~ Z, ~ X_sig + X_fac, data = d))
+  z_row <- broom::tidy(fit)[broom::tidy(fit)$term == "Z", ]
+  expect_equal(nrow(z_row), 1)
+  expect_true(is.finite(z_row$estimate))
+  expect_true(is.finite(z_row$std.error))
 })
 
 test_that("a well-conditioned selection warns about nothing", {
@@ -228,4 +242,67 @@ test_that("the selection is never pruned by the rank check", {
   fit <- suppressWarnings(estimatr::lm_lin(Y ~ Z, covariates = sel, data = dat))
   z_row <- broom::tidy(fit)[2, ]
   expect_true(is.finite(z_row$std.error))
+})
+
+
+# small and degenerate samples ----
+#
+# Every problem this package met in the wild arrived through a subgroup: a
+# politics stratum, a country subset, an arm split. Small and degenerate inputs
+# are the normal case there, not the exotic one.
+
+test_that("a sample too small to cross-validate returns ~1 rather than erroring", {
+  set.seed(41)
+  d <- data.frame(Z = rep(0:1, 4), X_a = rnorm(8), X_b = rnorm(8))
+  d$Y <- 0.5 * d$Z + rnorm(8)
+  expect_equal(all.vars(lasso_select_covariates(Y ~ Z, ~ X_a + X_b, data = d)), character(0))
+})
+
+test_that("no complete cases returns ~1", {
+  set.seed(42)
+  n <- 100
+  d <- data.frame(Z = rep(0:1, n / 2), X_a = rnorm(n), X_b = rnorm(n))
+  d$Y <- 0.5 * d$Z + rnorm(n)
+  # X_a and X_b are missing on disjoint halves, so no row is complete on both
+  d$X_a[1:(n / 2)] <- NA
+  d$X_b[(n / 2 + 1):n] <- NA
+  expect_equal(all.vars(lasso_select_covariates(Y ~ Z, ~ X_a + X_b, data = d)), character(0))
+})
+
+test_that("a single candidate is kept without cross-validating", {
+  # cv.glmnet needs at least two columns to choose between. With exactly one
+  # there is nothing to select, so it is included. Pinned because it means a
+  # one-candidate call never really runs a LASSO.
+  set.seed(43)
+  d <- data.frame(Z = rep(0:1, 6), X_a = rnorm(12))
+  d$Y <- 0.5 * d$Z + rnorm(12)
+
+  fit <- lm_lin_lasso(Y ~ Z, ~ X_a, data = d)
+  expect_equal(adjustment(fit), "lin")
+  expect_equal(selected_covariates(fit), "X_a")
+  expect_true(is.finite(broom::tidy(fit)$estimate[2]))
+})
+
+test_that("a tiny subgroup with several candidates falls back rather than failing", {
+  # Fewer than ten rows per arm, so the per-arm outcome equations bail out.
+  set.seed(46)
+  d <- data.frame(Z = rep(0:1, 6), X_a = rnorm(12), X_b = rnorm(12), X_c = rnorm(12))
+  d$Y <- 0.5 * d$Z + rnorm(12)
+
+  fit <- lm_lin_lasso(Y ~ Z, ~ X_a + X_b + X_c, data = d)
+  expect_true(adjustment(fit) %in% c("lin", "none"))
+  expect_true(is.finite(broom::tidy(fit)$estimate[2]))
+})
+
+test_that("haven_labelled candidates are handled", {
+  skip_if_not_installed("haven")
+  set.seed(44)
+  n <- 400
+  d <- data.frame(Z = rep(0:1, n / 2), X_noise = rnorm(n))
+  d$X_lab <- haven::labelled(sample(1:3, n, replace = TRUE),
+                             c(low = 1, mid = 2, high = 3))
+  d$Y <- 0.5 * d$Z + 1.5 * as.numeric(d$X_lab) + rnorm(n)
+
+  sel <- lasso_select_covariates(Y ~ Z, ~ X_lab + X_noise, data = d)
+  expect_true("X_lab" %in% all.vars(sel))
 })

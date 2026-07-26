@@ -302,3 +302,21 @@ test_that("lm_robust_lasso and lm_moderator_lasso are logged under their own nam
 
   expect_equal(fallback_log()$fn, c("lm_robust_lasso", "lm_moderator_lasso"))
 })
+
+
+test_that("lm_moderator_lasso falls back to the full candidate set when the selected fit is degenerate", {
+  set.seed(45)
+  n <- 200
+  d <- data.frame(
+    Z = rep(0:1, n / 2),
+    X_mod = rep(0:1, each = n / 2),
+    X_sig = rnorm(n)
+  )
+  d$Y <- 0.3 * d$Z + 0.5 * d$Z * d$X_mod + 2 * d$X_sig + rnorm(n)
+
+  fit <- suppressWarnings(lm_moderator_lasso(Y ~ Z, moderator = "X_mod", data = d,
+                                             covariates = ~ X_sig))
+  tidied <- broom::tidy(fit)
+  expect_true(any(grepl(":", tidied$term)))
+  expect_true(all(is.finite(tidied$estimate)))
+})
