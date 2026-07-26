@@ -79,12 +79,12 @@
 #' dat$Y <- 0.5 * dat$Z + 1.5 * dat$X1 + rnorm(n)
 #'
 #' # X1 predicts the outcome; X2 and X3 are noise
-#' select_covariates(Y ~ Z, ~ X1 + X2 + X3, data = dat)
+#' lasso_select_covariates(Y ~ Z, ~ X1 + X2 + X3, data = dat)
 #'
 #' @importFrom stats as.formula complete.cases model.matrix reformulate var coef
 #' @family covariate selection
 #' @export
-select_covariates <- function(formula, covariates, data,
+lasso_select_covariates <- function(formula, covariates, data,
                               lambda_rule = c("lambda.1se", "lambda.min"),
                               seed = 999) {
   lambda_rule <- match.arg(lambda_rule)

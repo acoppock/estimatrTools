@@ -31,7 +31,7 @@ vector of column names, or a bare expression.}
 \code{\link[estimatr]{lm_robust}}.}
 
 \item{lasso_args}{A named list of further arguments for
-\code{\link{select_covariates}}, such as \code{lambda_rule} or
+\code{\link{lasso_select_covariates}}, such as \code{lambda_rule} or
 \code{seed}.}
 }
 \value{
@@ -39,7 +39,7 @@ An \code{lm_robust} object, carrying the attributes described in
   \code{\link{adjustment}}.
 }
 \description{
-Runs \code{\link{select_covariates}} and fits
+Runs \code{\link{lasso_select_covariates}} and fits
 \code{\link[estimatr]{lm_robust}} with the selected covariates entered
 additively, that is \code{outcome ~ treatment + X1 + X2}.
 }
@@ -84,7 +84,7 @@ data: reexamining Freedman's critique. \emph{Annals of Applied Statistics},
 \code{\link{lm_lin_lasso}} for arm-specific slopes.
 
 Other adjusted estimators:
-\code{\link[=lm_int_lasso]{lm_int_lasso()}},
-\code{\link[=lm_lin_lasso]{lm_lin_lasso()}}
+\code{\link[=lm_lin_lasso]{lm_lin_lasso()}},
+\code{\link[=lm_moderator_lasso]{lm_moderator_lasso()}}
 }
 \concept{adjusted estimators}

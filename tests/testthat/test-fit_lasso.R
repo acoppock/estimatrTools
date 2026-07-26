@@ -118,7 +118,7 @@ test_that("weights are passed through", {
   )))
 })
 
-test_that("lasso_args reaches select_covariates", {
+test_that("lasso_args reaches lasso_select_covariates", {
   dat <- fit_data()
   liberal <- lm_lin_lasso(Y ~ Z, ~ X_sig + X_n1 + X_n2, data = dat,
                           lasso_args = list(lambda_rule = "lambda.min"))
@@ -128,7 +128,7 @@ test_that("lasso_args reaches select_covariates", {
              length(selected_covariates(parsimonious)))
 })
 
-test_that("lm_int_lasso fits the treatment-by-moderator interaction", {
+test_that("lm_moderator_lasso fits the treatment-by-moderator interaction", {
   set.seed(2)
   n <- 800
   dat <- data.frame(
@@ -139,7 +139,7 @@ test_that("lm_int_lasso fits the treatment-by-moderator interaction", {
   )
   dat$Y <- 0.2 * dat$Z + 0.6 * dat$Z * dat$X_pid + 2 * dat$X_sig + rnorm(n)
 
-  fit <- lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat,
+  fit <- lm_moderator_lasso(Y ~ Z, moderator = "X_pid", data = dat,
                       covariates = ~ X_sig + X_n1)
 
   tidied <- broom::tidy(fit)
@@ -150,13 +150,13 @@ test_that("lm_int_lasso fits the treatment-by-moderator interaction", {
   expect_true("X_sig" %in% selected_covariates(fit))
 })
 
-test_that("lm_int_lasso works with no candidate covariates", {
+test_that("lm_moderator_lasso works with no candidate covariates", {
   set.seed(2)
   n <- 400
   dat <- data.frame(Z = rep(0:1, n / 2), X_pid = rep(c(0, 1), each = n / 2))
   dat$Y <- 0.2 * dat$Z + 0.6 * dat$Z * dat$X_pid + rnorm(n)
 
-  fit <- lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat)
+  fit <- lm_moderator_lasso(Y ~ Z, moderator = "X_pid", data = dat)
   expect_equal(adjustment(fit), "none")
   expect_equal(selected_covariates(fit), character(0))
 })
@@ -218,7 +218,7 @@ test_that("fallback_summary handles an empty list and rejects a non-list", {
   expect_error(fallback_summary(1:3), "expected a list")
 })
 
-test_that("fallback_summary covers lm_robust_lasso and lm_int_lasso too", {
+test_that("fallback_summary covers lm_robust_lasso and lm_moderator_lasso too", {
   set.seed(4)
   n <- 400
   dat <- data.frame(Z = rep(0:1, n / 2), X_pid = rep(c(0, 1), each = n / 2),
@@ -227,7 +227,7 @@ test_that("fallback_summary covers lm_robust_lasso and lm_int_lasso too", {
 
   fits <- list(
     add = lm_robust_lasso(Y ~ Z, ~ X_sig, data = dat),
-    int = lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_sig)
+    int = lm_moderator_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_sig)
   )
   s <- fallback_summary(fits)
   expect_equal(nrow(s), 2)
@@ -289,7 +289,7 @@ test_that("logging can be switched off", {
   expect_equal(nrow(fallback_log()), 0)
 })
 
-test_that("lm_robust_lasso and lm_int_lasso are logged under their own names", {
+test_that("lm_robust_lasso and lm_moderator_lasso are logged under their own names", {
   reset_fallback_log()
   set.seed(4)
   n <- 400
@@ -298,7 +298,7 @@ test_that("lm_robust_lasso and lm_int_lasso are logged under their own names", {
   dat$Y <- 0.3 * dat$Z + 2 * dat$X_sig + rnorm(n)
 
   invisible(lm_robust_lasso(Y ~ Z, ~ X_sig, data = dat))
-  invisible(lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_sig))
+  invisible(lm_moderator_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_sig))
 
-  expect_equal(fallback_log()$fn, c("lm_robust_lasso", "lm_int_lasso"))
+  expect_equal(fallback_log()$fn, c("lm_robust_lasso", "lm_moderator_lasso"))
 })

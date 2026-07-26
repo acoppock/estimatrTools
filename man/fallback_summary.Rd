@@ -8,7 +8,7 @@ fallback_summary(fits, only_fallbacks = FALSE)
 }
 \arguments{
 \item{fits}{A list of fits from \code{\link{lm_lin_lasso}},
-\code{\link{lm_robust_lasso}}, or \code{\link{lm_int_lasso}}. If the list
+\code{\link{lm_robust_lasso}}, or \code{\link{lm_moderator_lasso}}. If the list
 is named, the names are used to label rows. Elements that were not produced
 by this package are reported with \code{adjustment = NA}.}
 

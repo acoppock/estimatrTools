@@ -9,7 +9,7 @@ reference:
     Post-double-selection LASSO: the outcome within each treatment arm, and
     each arm indicator on the candidates.
   contents:
-  - select_covariates
+  - lasso_select_covariates
 
 - title: Adjusted estimators
   desc: >
@@ -18,7 +18,7 @@ reference:
   contents:
   - lm_lin_lasso
   - lm_robust_lasso
-  - lm_int_lasso
+  - lm_moderator_lasso
 
 - title: What actually ran
   desc: >

@@ -14,7 +14,7 @@ fallback_reason(fit)
 }
 \arguments{
 \item{fit}{A fit returned by \code{\link{lm_lin_lasso}},
-\code{\link{lm_robust_lasso}}, or \code{\link{lm_int_lasso}}.}
+\code{\link{lm_robust_lasso}}, or \code{\link{lm_moderator_lasso}}.}
 }
 \value{
 \code{adjustment()} returns \code{"lin"}, \code{"robust"}, or

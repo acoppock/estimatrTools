@@ -2,7 +2,7 @@
 "_PACKAGE"
 
 #' @section Selecting covariates:
-#' \code{\link{select_covariates}} chooses a covariate set by running LASSO of
+#' \code{\link{lasso_select_covariates}} chooses a covariate set by running LASSO of
 #' the outcome on candidates \emph{within each treatment arm}, and of each arm
 #' indicator on candidates. The first is what makes the selection appropriate
 #' for an estimator with a separate slope per arm; the second is the
@@ -12,7 +12,7 @@
 #' @section Fitting:
 #' \code{\link{lm_lin_lasso}} fits the Lin (2013) interacted estimator on the
 #' selected set, \code{\link{lm_robust_lasso}} fits them additively, and
-#' \code{\link{lm_int_lasso}} fits a treatment-by-moderator model with the
+#' \code{\link{lm_moderator_lasso}} fits a treatment-by-moderator model with the
 #' selected covariates entered additively alongside.
 #'
 #' @section Knowing what actually ran:

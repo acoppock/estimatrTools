@@ -17,7 +17,7 @@ remotes::install_github("acoppock/estimatrTools")
 
 ## Selecting covariates
 
-`select_covariates()` runs two families of LASSO regressions and takes their
+`lasso_select_covariates()` runs two families of LASSO regressions and takes their
 union:
 
 - **Outcome equations**, fit *within each treatment arm*. Running these
@@ -31,7 +31,7 @@ union:
 ```r
 library(estimatrTools)
 
-select_covariates(Y ~ Z, ~ X_age + X_educ + X_income, data = dat)
+lasso_select_covariates(Y ~ Z, ~ X_age + X_educ + X_income, data = dat)
 #> ~X_age
 ```
 
@@ -45,7 +45,7 @@ drag the other in.
 ```r
 lm_lin_lasso(Y ~ Z, ~ X_age + X_educ, data = dat)     # Lin: slope per arm
 lm_robust_lasso(Y ~ Z, ~ X_age + X_educ, data = dat)  # additive
-lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_age)
+lm_moderator_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_age)
 ```
 
 `lm_lin_lasso()` is the default choice. `lm_robust_lasso()` assumes a common

@@ -38,7 +38,7 @@ dat <- data.frame(
 dat$Y <- 0.3 * dat$Z + 1.5 * dat$X_prog + 2 * dat$Z * dat$X_het + rnorm(n)
 
 candidates <- ~ X_prog + X_het + X_noise_1 + X_noise_2
-select_covariates(Y ~ Z, candidates, data = dat)
+lasso_select_covariates(Y ~ Z, candidates, data = dat)
 ```
 
 Both real covariates are found and the noise is not. `X_het` is the interesting
@@ -71,7 +71,7 @@ longer guaranteed to be consistent for the ATE. Lin (2013) recommends the
 interacted form as the default for that reason. The choice is yours to make, not
 the package's, which is why they are separate functions rather than an argument.
 
-`lm_int_lasso()` fits `Y ~ Z * moderator` with the selected covariates entered
+`lm_moderator_lasso()` fits `Y ~ Z * moderator` with the selected covariates entered
 additively alongside, deliberately not interacted with treatment or moderator.
 
 ## What actually ran

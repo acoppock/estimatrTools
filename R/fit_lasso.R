@@ -1,6 +1,6 @@
 #' Lin estimator on LASSO-selected covariates
 #'
-#' Runs \code{\link{select_covariates}} and fits
+#' Runs \code{\link{lasso_select_covariates}} and fits
 #' \code{\link[estimatr]{lm_lin}} on the selected set: a separate covariate
 #' slope in each treatment arm, with covariates centered at their full-sample
 #' means so the treatment coefficient remains an estimate of the average
@@ -25,7 +25,7 @@
 #'   Passed through to \code{\link[estimatr]{lm_lin}} or
 #'   \code{\link[estimatr]{lm_robust}}.
 #' @param lasso_args A named list of further arguments for
-#'   \code{\link{select_covariates}}, such as \code{lambda_rule} or
+#'   \code{\link{lasso_select_covariates}}, such as \code{lambda_rule} or
 #'   \code{seed}.
 #'
 #' @return An \code{lm_robust} object, carrying the attributes described in
@@ -42,7 +42,7 @@
 #' selected_covariates(fit)
 #'
 #' @seealso \code{\link{lm_robust_lasso}} for additive adjustment,
-#'   \code{\link{lm_int_lasso}} for a treatment-by-moderator model.
+#'   \code{\link{lm_moderator_lasso}} for a treatment-by-moderator model.
 #' @family adjusted estimators
 #' @export
 lm_lin_lasso <- function(formula, covariates, data,
@@ -53,7 +53,7 @@ lm_lin_lasso <- function(formula, covariates, data,
   cov_names <- resolve_covariate_names(substitute(covariates), covariates)
 
   selected <- do.call(
-    select_covariates,
+    lasso_select_covariates,
     c(list(formula = formula, covariates = cov_names, data = data), lasso_args)
   )
   sel_vars <- all.vars(selected)
@@ -91,7 +91,7 @@ lm_lin_lasso <- function(formula, covariates, data,
 
 #' Additive robust regression on LASSO-selected covariates
 #'
-#' Runs \code{\link{select_covariates}} and fits
+#' Runs \code{\link{lasso_select_covariates}} and fits
 #' \code{\link[estimatr]{lm_robust}} with the selected covariates entered
 #' additively, that is \code{outcome ~ treatment + X1 + X2}.
 #'
@@ -136,7 +136,7 @@ lm_robust_lasso <- function(formula, covariates, data,
   cov_names <- resolve_covariate_names(substitute(covariates), covariates)
 
   selected <- do.call(
-    select_covariates,
+    lasso_select_covariates,
     c(list(formula = formula, covariates = cov_names, data = data), lasso_args)
   )
   sel_vars <- all.vars(selected)
@@ -183,7 +183,7 @@ lm_robust_lasso <- function(formula, covariates, data,
 #' Treatment-by-moderator model with LASSO-selected covariates
 #'
 #' Fits \code{outcome ~ treatment * moderator + selected covariates}, where the
-#' covariates are chosen by \code{\link{select_covariates}} from the focal
+#' covariates are chosen by \code{\link{lasso_select_covariates}} from the focal
 #' \code{outcome ~ treatment} equation.
 #'
 #' The selected covariates enter additively and are deliberately not
@@ -208,7 +208,7 @@ lm_robust_lasso <- function(formula, covariates, data,
 #' @param clusters,ci,alpha Passed through to
 #'   \code{\link[estimatr]{lm_robust}}.
 #' @param lasso_args A named list of further arguments for
-#'   \code{\link{select_covariates}}.
+#'   \code{\link{lasso_select_covariates}}.
 #'
 #' @return An \code{lm_robust} object, carrying the attributes described in
 #'   \code{\link{adjustment}}. When the interacted fit with selected
@@ -225,12 +225,12 @@ lm_robust_lasso <- function(formula, covariates, data,
 #' )
 #' dat$Y <- 0.2 * dat$Z + 0.6 * dat$Z * dat$X_pid + 1.5 * dat$X1 + rnorm(n)
 #'
-#' lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X1 + X2)
+#' lm_moderator_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X1 + X2)
 #'
 #' @importFrom stats as.formula coef reformulate
 #' @family adjusted estimators
 #' @export
-lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
+lm_moderator_lasso <- function(formula, moderator, data, covariates = NULL,
                          clusters = NULL, ci = TRUE, alpha = 0.05,
                          lasso_args = list()) {
   cov_names <- if (is.null(covariates)) {
@@ -241,7 +241,7 @@ lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
 
   selected <- if (length(cov_names) > 0) {
     do.call(
-      select_covariates,
+      lasso_select_covariates,
       c(list(formula = formula, covariates = cov_names, data = data), lasso_args)
     )
   } else {
@@ -276,13 +276,13 @@ lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
                    adjustment = if (length(sel_vars) > 0) "robust" else "none",
                    selected = sel_vars,
                    fallback = NA_character_,
-                   fn = "lm_int_lasso", formula = formula))
+                   fn = "lm_moderator_lasso", formula = formula))
   }
 
   fit_full <- call_lm_robust(interaction_formula(cov_names))
   tag_fit(fit_full, adjustment = "robust", selected = cov_names,
           fallback = "selected-covariate interaction fit was degenerate; used the full candidate set",
-          fn = "lm_int_lasso", formula = formula)
+          fn = "lm_moderator_lasso", formula = formula)
 }
 
 
@@ -294,7 +294,7 @@ lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
 #' the results rather than buried inside the wrapper.
 #'
 #' @param fit A fit returned by \code{\link{lm_lin_lasso}},
-#'   \code{\link{lm_robust_lasso}}, or \code{\link{lm_int_lasso}}.
+#'   \code{\link{lm_robust_lasso}}, or \code{\link{lm_moderator_lasso}}.
 #'
 #' @return \code{adjustment()} returns \code{"lin"}, \code{"robust"}, or
 #'   \code{"none"}. \code{selected_covariates()} returns the character vector
@@ -340,7 +340,7 @@ fallback_reason <- function(fit) attr(fit, "estimatrTools_fallback")
 #' record rather than in the wrapper.
 #'
 #' @param fits A list of fits from \code{\link{lm_lin_lasso}},
-#'   \code{\link{lm_robust_lasso}}, or \code{\link{lm_int_lasso}}. If the list
+#'   \code{\link{lm_robust_lasso}}, or \code{\link{lm_moderator_lasso}}. If the list
 #'   is named, the names are used to label rows. Elements that were not produced
 #'   by this package are reported with \code{adjustment = NA}.
 #' @param only_fallbacks Logical. If \code{TRUE}, return only the rows where a
