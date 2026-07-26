@@ -167,3 +167,69 @@ test_that("accessors return NULL for a fit this package did not produce", {
   expect_null(selected_covariates(plain))
   expect_null(fallback_reason(plain))
 })
+
+
+# fallback_summary ----
+
+test_that("fallback_summary reports one row per fit", {
+  fits <- list(
+    informative = lm_lin_lasso(Y ~ Z, ~ X_sig + X_n1, data = fit_data()),
+    noise_only  = lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data())
+  )
+  s <- fallback_summary(fits)
+
+  expect_equal(nrow(s), 2)
+  expect_equal(s$fit, c("informative", "noise_only"))
+  expect_equal(s$adjustment, c("lin", "none"))
+  expect_true(is.na(s$fallback_reason[1]))
+  expect_equal(s$fallback_reason[2], "no covariates selected")
+  expect_true(s$n_selected[1] > 0)
+  expect_equal(s$n_selected[2], 0)
+})
+
+test_that("only_fallbacks filters to the substitutions", {
+  fits <- list(
+    a = lm_lin_lasso(Y ~ Z, ~ X_sig + X_n1, data = fit_data()),
+    b = lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data())
+  )
+  s <- fallback_summary(fits, only_fallbacks = TRUE)
+  expect_equal(nrow(s), 1)
+  expect_equal(s$fit, "b")
+})
+
+test_that("unnamed lists are labelled by index", {
+  fits <- list(lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data()))
+  expect_equal(fallback_summary(fits)$fit, "1")
+})
+
+test_that("fits from outside the package are reported as NA, not dropped", {
+  fits <- list(
+    ours   = lm_lin_lasso(Y ~ Z, ~ X_sig, data = fit_data()),
+    theirs = estimatr::lm_robust(Y ~ Z, data = fit_data())
+  )
+  s <- fallback_summary(fits)
+  expect_equal(nrow(s), 2)
+  expect_true(is.na(s$adjustment[2]))
+  expect_true(is.na(s$n_selected[2]))
+})
+
+test_that("fallback_summary handles an empty list and rejects a non-list", {
+  expect_equal(nrow(fallback_summary(list())), 0)
+  expect_error(fallback_summary(1:3), "expected a list")
+})
+
+test_that("fallback_summary covers lm_robust_lasso and lm_int_lasso too", {
+  set.seed(4)
+  n <- 400
+  dat <- data.frame(Z = rep(0:1, n / 2), X_pid = rep(c(0, 1), each = n / 2),
+                    X_sig = rnorm(n))
+  dat$Y <- 0.3 * dat$Z + 2 * dat$X_sig + rnorm(n)
+
+  fits <- list(
+    add = lm_robust_lasso(Y ~ Z, ~ X_sig, data = dat),
+    int = lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_sig)
+  )
+  s <- fallback_summary(fits)
+  expect_equal(nrow(s), 2)
+  expect_true(all(s$adjustment %in% c("lin", "robust", "none")))
+})

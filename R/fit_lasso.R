@@ -316,6 +316,80 @@ selected_covariates <- function(fit) attr(fit, "estimatrTools_selected")
 fallback_reason <- function(fit) attr(fit, "estimatrTools_fallback")
 
 
+#' Summarize what a collection of fits actually did
+#'
+#' \code{\link{adjustment}} and \code{\link{fallback_reason}} report on one fit
+#' at a time, which is not usable across a pipeline of hundreds. This walks a
+#' list of fits and returns one row each, so a fallback that quietly changed the
+#' estimator for a handful of specifications is visible without inspecting every
+#' fit by hand.
+#'
+#' A fallback is not an error: it means the requested adjustment could not be
+#' produced and a simpler specification was used instead. That is usually the
+#' right thing to do, but it changes what the estimate is, so it belongs in the
+#' record rather than in the wrapper.
+#'
+#' @param fits A list of fits from \code{\link{lm_lin_lasso}},
+#'   \code{\link{lm_robust_lasso}}, or \code{\link{lm_int_lasso}}. If the list
+#'   is named, the names are used to label rows. Elements that were not produced
+#'   by this package are reported with \code{adjustment = NA}.
+#' @param only_fallbacks Logical. If \code{TRUE}, return only the rows where a
+#'   fallback fired (default \code{FALSE}).
+#'
+#' @return A data frame with columns \code{fit} (name or index),
+#'   \code{adjustment}, \code{n_selected}, \code{selected}, and
+#'   \code{fallback_reason}.
+#'
+#' @examples
+#' set.seed(1)
+#' n <- 400
+#' dat <- data.frame(Z = rep(0:1, n / 2), X_sig = rnorm(n), X_noise = rnorm(n))
+#' dat$Y <- 0.5 * dat$Z + 2 * dat$X_sig + rnorm(n)
+#'
+#' fits <- list(
+#'   informative = lm_lin_lasso(Y ~ Z, ~ X_sig + X_noise, data = dat),
+#'   noise_only  = lm_lin_lasso(Y ~ Z, ~ X_noise, data = dat)
+#' )
+#' fallback_summary(fits)
+#' fallback_summary(fits, only_fallbacks = TRUE)
+#'
+#' @export
+fallback_summary <- function(fits, only_fallbacks = FALSE) {
+  if (!is.list(fits)) {
+    stop("fallback_summary: expected a list of fits, got ", class(fits)[1], ".")
+  }
+
+  empty <- data.frame(
+    fit = character(0), adjustment = character(0), n_selected = integer(0),
+    selected = character(0), fallback_reason = character(0),
+    stringsAsFactors = FALSE
+  )
+  if (length(fits) == 0) return(empty)
+
+  labels <- names(fits)
+  if (is.null(labels)) labels <- as.character(seq_along(fits))
+  labels[labels == ""] <- as.character(seq_along(fits))[labels == ""]
+
+  rows <- lapply(seq_along(fits), function(i) {
+    fit <- fits[[i]]
+    sel <- selected_covariates(fit)
+    data.frame(
+      fit = labels[i],
+      adjustment = if (is.null(adjustment(fit))) NA_character_ else adjustment(fit),
+      n_selected = if (is.null(sel)) NA_integer_ else length(sel),
+      selected = if (is.null(sel)) NA_character_ else paste(sel, collapse = ", "),
+      fallback_reason = if (is.null(fallback_reason(fit))) NA_character_ else fallback_reason(fit),
+      stringsAsFactors = FALSE
+    )
+  })
+
+  out <- do.call(rbind, rows)
+  if (only_fallbacks) out <- out[!is.na(out$fallback_reason), , drop = FALSE]
+  rownames(out) <- NULL
+  out
+}
+
+
 #' Record what a fit actually did
 #'
 #' @param fit A fitted model.

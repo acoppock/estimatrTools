@@ -2,6 +2,7 @@
 
 export(adjustment)
 export(fallback_reason)
+export(fallback_summary)
 export(lm_int_lasso)
 export(lm_lin_lasso)
 export(lm_robust_lasso)
