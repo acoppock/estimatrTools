@@ -82,6 +82,7 @@
 #' select_covariates(Y ~ Z, ~ X1 + X2 + X3, data = dat)
 #'
 #' @importFrom stats as.formula complete.cases model.matrix reformulate var coef
+#' @family covariate selection
 #' @export
 select_covariates <- function(formula, covariates, data,
                               lambda_rule = c("lambda.1se", "lambda.min"),

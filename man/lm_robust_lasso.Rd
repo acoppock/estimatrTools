@@ -82,4 +82,9 @@ data: reexamining Freedman's critique. \emph{Annals of Applied Statistics},
 }
 \seealso{
 \code{\link{lm_lin_lasso}} for arm-specific slopes.
+
+Other adjusted estimators:
+\code{\link[=lm_int_lasso]{lm_int_lasso()}},
+\code{\link[=lm_lin_lasso]{lm_lin_lasso()}}
 }
+\concept{adjusted estimators}

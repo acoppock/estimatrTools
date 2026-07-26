@@ -41,3 +41,9 @@ adjustment(fit)
 fallback_reason(fit)
 
 }
+\seealso{
+Other fallback reporting:
+\code{\link[=fallback_log]{fallback_log()}},
+\code{\link[=fallback_summary]{fallback_summary()}}
+}
+\concept{fallback reporting}

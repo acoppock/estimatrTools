@@ -106,3 +106,4 @@ Lin, W. (2013). Agnostic notes on regression adjustments to experimental
 data: reexamining Freedman's critique. \emph{Annals of Applied Statistics},
 7(1), 295-318. \doi{10.1214/12-AOAS583}
 }
+\concept{covariate selection}

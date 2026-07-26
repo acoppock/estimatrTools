@@ -72,4 +72,9 @@ selected_covariates(fit)
 \seealso{
 \code{\link{lm_robust_lasso}} for additive adjustment,
   \code{\link{lm_int_lasso}} for a treatment-by-moderator model.
+
+Other adjusted estimators:
+\code{\link[=lm_int_lasso]{lm_int_lasso()}},
+\code{\link[=lm_robust_lasso]{lm_robust_lasso()}}
 }
+\concept{adjusted estimators}

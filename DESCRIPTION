@@ -18,6 +18,8 @@ Description: Companion tools for 'estimatr'. Selects covariates by LASSO within
     function falls back to an unadjusted specification when selection returns
     nothing or the adjusted fit is degenerate, so a fit is always returned and
     the fallback is reported rather than hidden.
+URL: https://alexandercoppock.com/estimatrTools/, https://github.com/acoppock/estimatrTools
+BugReports: https://github.com/acoppock/estimatrTools/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 Imports:
@@ -26,6 +28,9 @@ Imports:
     glmnet,
     stats
 Suggests:
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

@@ -43,6 +43,7 @@
 #'
 #' @seealso \code{\link{lm_robust_lasso}} for additive adjustment,
 #'   \code{\link{lm_int_lasso}} for a treatment-by-moderator model.
+#' @family adjusted estimators
 #' @export
 lm_lin_lasso <- function(formula, covariates, data,
                          weights = NULL, subset = NULL, clusters = NULL,
@@ -66,7 +67,8 @@ lm_lin_lasso <- function(formula, covariates, data,
 
   fallback <- function(reason) {
     fit <- call_estimatr(estimatr::lm_robust, nse_args, plain_args, envir)
-    tag_fit(fit, adjustment = "none", selected = character(0), fallback = reason)
+    tag_fit(fit, adjustment = "none", selected = character(0), fallback = reason,
+            fn = "lm_lin_lasso", formula = formula)
   }
 
   if (length(sel_vars) == 0) return(fallback("no covariates selected"))
@@ -82,7 +84,8 @@ lm_lin_lasso <- function(formula, covariates, data,
     return(fallback("adjusted fit had a non-finite treatment standard error"))
   }
 
-  tag_fit(fit_adj, adjustment = "lin", selected = sel_vars, fallback = NA_character_)
+  tag_fit(fit_adj, adjustment = "lin", selected = sel_vars, fallback = NA_character_,
+          fn = "lm_lin_lasso", formula = formula)
 }
 
 
@@ -123,6 +126,7 @@ lm_lin_lasso <- function(formula, covariates, data,
 #'
 #' @seealso \code{\link{lm_lin_lasso}} for arm-specific slopes.
 #' @importFrom stats as.formula
+#' @family adjusted estimators
 #' @export
 lm_robust_lasso <- function(formula, covariates, data,
                             weights = NULL, subset = NULL, clusters = NULL,
@@ -149,7 +153,8 @@ lm_robust_lasso <- function(formula, covariates, data,
   fallback <- function(reason) {
     fit <- call_estimatr(estimatr::lm_robust, nse_args,
                          c(list(formula = formula), plain_args), envir)
-    tag_fit(fit, adjustment = "none", selected = character(0), fallback = reason)
+    tag_fit(fit, adjustment = "none", selected = character(0), fallback = reason,
+            fn = "lm_robust_lasso", formula = formula)
   }
 
   if (length(sel_vars) == 0) return(fallback("no covariates selected"))
@@ -170,7 +175,8 @@ lm_robust_lasso <- function(formula, covariates, data,
     return(fallback("adjusted fit had a non-finite treatment standard error"))
   }
 
-  tag_fit(fit_adj, adjustment = "robust", selected = sel_vars, fallback = NA_character_)
+  tag_fit(fit_adj, adjustment = "robust", selected = sel_vars, fallback = NA_character_,
+          fn = "lm_robust_lasso", formula = formula)
 }
 
 
@@ -222,6 +228,7 @@ lm_robust_lasso <- function(formula, covariates, data,
 #' lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X1 + X2)
 #'
 #' @importFrom stats as.formula coef reformulate
+#' @family adjusted estimators
 #' @export
 lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
                          clusters = NULL, ci = TRUE, alpha = 0.05,
@@ -268,12 +275,14 @@ lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
     return(tag_fit(fit,
                    adjustment = if (length(sel_vars) > 0) "robust" else "none",
                    selected = sel_vars,
-                   fallback = NA_character_))
+                   fallback = NA_character_,
+                   fn = "lm_int_lasso", formula = formula))
   }
 
   fit_full <- call_lm_robust(interaction_formula(cov_names))
   tag_fit(fit_full, adjustment = "robust", selected = cov_names,
-          fallback = "selected-covariate interaction fit was degenerate; used the full candidate set")
+          fallback = "selected-covariate interaction fit was degenerate; used the full candidate set",
+          fn = "lm_int_lasso", formula = formula)
 }
 
 
@@ -304,6 +313,7 @@ lm_int_lasso <- function(formula, moderator, data, covariates = NULL,
 #' adjustment(fit)
 #' fallback_reason(fit)
 #'
+#' @family fallback reporting
 #' @export
 adjustment <- function(fit) attr(fit, "estimatrTools_adjustment")
 
@@ -353,6 +363,7 @@ fallback_reason <- function(fit) attr(fit, "estimatrTools_fallback")
 #' fallback_summary(fits)
 #' fallback_summary(fits, only_fallbacks = TRUE)
 #'
+#' @family fallback reporting
 #' @export
 fallback_summary <- function(fits, only_fallbacks = FALSE) {
   if (!is.list(fits)) {
@@ -399,10 +410,14 @@ fallback_summary <- function(fits, only_fallbacks = FALSE) {
 #' @return The fit, with attributes attached.
 #' @keywords internal
 #' @noRd
-tag_fit <- function(fit, adjustment, selected, fallback) {
+tag_fit <- function(fit, adjustment, selected, fallback, fn = NA_character_,
+                    formula = NULL) {
   attr(fit, "estimatrTools_adjustment") <- adjustment
   attr(fit, "estimatrTools_selected") <- selected
   attr(fit, "estimatrTools_fallback") <- fallback
+  # Also record it where it will outlive the object: the dominant calling shape
+  # discards the fit, so the attributes alone leave the fallback invisible.
+  record_fit(fn, formula, adjustment, selected, fallback)
   fit
 }
 

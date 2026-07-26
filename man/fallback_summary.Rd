@@ -47,3 +47,9 @@ fallback_summary(fits)
 fallback_summary(fits, only_fallbacks = TRUE)
 
 }
+\seealso{
+Other fallback reporting:
+\code{\link[=adjustment]{adjustment()}},
+\code{\link[=fallback_log]{fallback_log()}}
+}
+\concept{fallback reporting}

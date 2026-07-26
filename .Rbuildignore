@@ -4,3 +4,7 @@
 ^\.claude$
 ^LICENSE\.md$
 ^notes$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^notes$

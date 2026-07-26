@@ -233,3 +233,72 @@ test_that("fallback_summary covers lm_robust_lasso and lm_int_lasso too", {
   expect_equal(nrow(s), 2)
   expect_true(all(s$adjustment %in% c("lin", "robust", "none")))
 })
+
+
+# fallback_log ----
+
+test_that("the log records every call, including discarded fits", {
+  reset_fallback_log()
+
+  # Fits built anonymously and thrown away, which is the dominant calling shape
+  invisible(lapply(1:2, function(i) lm_lin_lasso(Y ~ Z, ~ X_sig + X_n1, data = fit_data())))
+  invisible(lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data()))
+
+  log <- fallback_log()
+  expect_equal(nrow(log), 3)
+  expect_equal(log$fn, rep("lm_lin_lasso", 3))
+  expect_equal(log$outcome, rep("Y", 3))
+  expect_equal(log$treatment, rep("Z", 3))
+  expect_equal(log$adjustment, c("lin", "lin", "none"))
+  expect_equal(sum(!is.na(log$fallback_reason)), 1)
+  expect_equal(log$call_index, 1:3)
+})
+
+test_that("fallbacks_only narrows to the substitutions", {
+  reset_fallback_log()
+  invisible(lm_lin_lasso(Y ~ Z, ~ X_sig, data = fit_data()))
+  invisible(lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data()))
+
+  expect_equal(nrow(fallback_log(fallbacks_only = TRUE)), 1)
+  expect_equal(fallback_log(fallbacks_only = TRUE)$adjustment, "none")
+})
+
+test_that("the adjustment rate is recoverable from the log", {
+  reset_fallback_log()
+  invisible(lm_lin_lasso(Y ~ Z, ~ X_sig, data = fit_data()))
+  invisible(lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data()))
+  invisible(lm_lin_lasso(Y ~ Z, ~ X1 + X2, data = noise_data()))
+
+  rate <- mean(fallback_log()$adjustment != "none")
+  expect_equal(rate, 1 / 3)
+})
+
+test_that("reset clears the log and an empty log has the right shape", {
+  reset_fallback_log()
+  expect_equal(nrow(fallback_log()), 0)
+  expect_named(fallback_log(), c("call_index", "fn", "outcome", "treatment",
+                                 "adjustment", "n_selected", "fallback_reason"))
+})
+
+test_that("logging can be switched off", {
+  reset_fallback_log()
+  withr_opt <- options(estimatrTools.log = FALSE)
+  on.exit(options(withr_opt), add = TRUE)
+
+  invisible(lm_lin_lasso(Y ~ Z, ~ X_sig, data = fit_data()))
+  expect_equal(nrow(fallback_log()), 0)
+})
+
+test_that("lm_robust_lasso and lm_int_lasso are logged under their own names", {
+  reset_fallback_log()
+  set.seed(4)
+  n <- 400
+  dat <- data.frame(Z = rep(0:1, n / 2), X_pid = rep(c(0, 1), each = n / 2),
+                    X_sig = rnorm(n))
+  dat$Y <- 0.3 * dat$Z + 2 * dat$X_sig + rnorm(n)
+
+  invisible(lm_robust_lasso(Y ~ Z, ~ X_sig, data = dat))
+  invisible(lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X_sig))
+
+  expect_equal(fallback_log()$fn, c("lm_robust_lasso", "lm_int_lasso"))
+})

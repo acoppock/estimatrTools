@@ -1,0 +1,40 @@
+url: https://alexandercoppock.com/estimatrTools/
+
+template:
+  bootstrap: 5
+
+reference:
+- title: Selecting covariates
+  desc: >
+    Post-double-selection LASSO: the outcome within each treatment arm, and
+    each arm indicator on the candidates.
+  contents:
+  - select_covariates
+
+- title: Adjusted estimators
+  desc: >
+    Fit the selected set. Each falls back to a simpler specification when
+    selection returns nothing or the adjusted fit is degenerate.
+  contents:
+  - lm_lin_lasso
+  - lm_robust_lasso
+  - lm_int_lasso
+
+- title: What actually ran
+  desc: >
+    A fallback changes what the estimate is, so it is recorded rather than
+    hidden. Which accessor you need depends on whether you still hold the fit.
+  contents:
+  - adjustment
+  - fallback_summary
+  - fallback_log
+
+- title: Package
+  contents:
+  - estimatrTools-package
+
+articles:
+- title: Articles
+  navbar: ~
+  contents:
+  - covariate_selection

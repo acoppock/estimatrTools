@@ -70,3 +70,9 @@ dat$Y <- 0.2 * dat$Z + 0.6 * dat$Z * dat$X_pid + 1.5 * dat$X1 + rnorm(n)
 lm_int_lasso(Y ~ Z, moderator = "X_pid", data = dat, covariates = ~ X1 + X2)
 
 }
+\seealso{
+Other adjusted estimators:
+\code{\link[=lm_lin_lasso]{lm_lin_lasso()}},
+\code{\link[=lm_robust_lasso]{lm_robust_lasso()}}
+}
+\concept{adjusted estimators}
