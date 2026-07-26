@@ -81,7 +81,7 @@
 #' # X1 predicts the outcome; X2 and X3 are noise
 #' lasso_select_covariates(Y ~ Z, ~ X1 + X2 + X3, data = dat)
 #'
-#' @importFrom stats as.formula complete.cases model.matrix reformulate var coef
+#' @importFrom stats as.formula complete.cases model.matrix reformulate var coef terms setNames
 #' @family covariate selection
 #' @export
 lasso_select_covariates <- function(formula, covariates, data,
@@ -115,11 +115,21 @@ lasso_select_covariates <- function(formula, covariates, data,
   z <- df[[treatment]]
   if (length(unique(z)) < 2) return(~1)
 
-  X <- tryCatch(
-    stats::model.matrix(stats::reformulate(covariate_cols), data = df)[, -1, drop = FALSE],
-    error = function(e) NULL
-  )
-  if (is.null(X) || ncol(X) == 0) return(~1)
+  mm_formula <- stats::reformulate(covariate_cols)
+  mm <- tryCatch(stats::model.matrix(mm_formula, data = df), error = function(e) NULL)
+  if (is.null(mm) || ncol(mm) < 2) return(~1)
+
+  X <- mm[, -1, drop = FALSE]
+
+  # Map each model-matrix column to the covariate that produced it, using the
+  # `assign` attribute rather than matching on names. R records the mapping
+  # exactly: assign[j] is the index of the term that generated column j. Name
+  # matching cannot recover this reliably, because a factor expands to columns
+  # named <covariate><level> with no separator, so any prefix test guesses.
+  mm_assign <- attr(mm, "assign")[-1]
+  mm_terms <- attr(stats::terms(mm_formula, data = df), "term.labels")
+  x_col_to_original <- stats::setNames(mm_terms[mm_assign], colnames(X))
+
   X <- scale(X)
 
   restore_seed <- capture_seed()
@@ -139,19 +149,10 @@ lasso_select_covariates <- function(formula, covariates, data,
   selected <- union(selected_y, selected_z)
   if (length(selected) == 0) return(~1)
 
-  # Map each selected model-matrix column back to its source covariate. Factors
-  # expand to columns named <covariate><level> with no separator (e.g.
-  # "X_region3", "X_supporterRegime supporter"), so a bare startsWith
-  # over-includes whenever one covariate name is a string prefix of another:
-  # both would match the longer covariate's indicator columns. Attribute each
-  # selected name to its LONGEST matching covariate name instead. Identical to
-  # the bare-prefix test whenever no covariate name prefixes another, and
-  # correct when one does.
-  source_of <- function(nm) {
-    hits <- covariate_cols[startsWith(nm, covariate_cols)]
-    if (length(hits) == 0) NA_character_ else hits[which.max(nchar(hits))]
-  }
-  selected_sources <- unique(vapply(selected, source_of, character(1)))
+  # Attribute selected columns to source covariates via the exact `assign`
+  # mapping built above, preserving the original candidate order.
+  selected_sources <- unique(unname(x_col_to_original[selected]))
+  selected_sources <- selected_sources[!is.na(selected_sources)]
   original_cols <- covariate_cols[covariate_cols %in% selected_sources]
 
   if (length(original_cols) == 0) return(~1)
