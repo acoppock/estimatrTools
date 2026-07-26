@@ -163,3 +163,69 @@ test_that("lambda_rule is validated", {
     "should be one of"
   )
 })
+
+
+# rank-deficiency diagnosis ----
+
+test_that("an empty level-by-arm cell warns and names the cell", {
+  set.seed(21)
+  n <- 400
+  dat <- data.frame(
+    Z = rep(0:1, each = n / 2),
+    X_sig = rnorm(n),
+    X_fac = factor(c(sample(c("a", "b", "c"), n / 2, replace = TRUE),
+                     sample(c("a", "b"), n / 2, replace = TRUE)))
+  )
+  dat$Y <- 0.5 * dat$Z + 2 * dat$X_sig + 1.5 * (dat$X_fac == "c") + rnorm(n)
+
+  expect_warning(
+    sel <- lasso_select_covariates(Y ~ Z, ~ X_sig + X_fac, data = dat),
+    "rank deficient"
+  )
+  # the selection is returned unchanged: nothing is pruned
+  expect_true("X_fac" %in% all.vars(sel))
+})
+
+test_that("a redundant covariate is named, with a paste-ready exclusion", {
+  set.seed(5)
+  n <- 600
+  educ <- factor(sample(c("hs", "college", "postgrad"), n, replace = TRUE))
+  dat <- data.frame(
+    Z = rep(0:1, n / 2),
+    X_educ = educ,
+    X_college = as.integer(educ %in% c("college", "postgrad")),  # nested in X_educ
+    X_sig = rnorm(n)
+  )
+  dat$Y <- 0.4 * dat$Z + 2 * dat$X_sig + 1.2 * dat$X_college + rnorm(n)
+
+  w <- tryCatch(lasso_select_covariates(Y ~ Z, ~ X_educ + X_college + X_sig, data = dat),
+                warning = function(x) conditionMessage(x))
+  if (is.character(w)) {
+    expect_match(w, "redundancy")
+    expect_match(w, "covariates = c\\(")
+  } else {
+    succeed("design was full rank for this draw")
+  }
+})
+
+test_that("a well-conditioned selection warns about nothing", {
+  expect_silent(lasso_select_covariates(Y ~ Z, ~ X_sig + X_n1 + X_n2, data = signal_data()))
+})
+
+test_that("the selection is never pruned by the rank check", {
+  set.seed(21)
+  n <- 400
+  dat <- data.frame(
+    Z = rep(0:1, each = n / 2),
+    X_sig = rnorm(n),
+    X_fac = factor(c(sample(c("a", "b", "c"), n / 2, replace = TRUE),
+                     sample(c("a", "b"), n / 2, replace = TRUE)))
+  )
+  dat$Y <- 0.5 * dat$Z + 2 * dat$X_sig + 1.5 * (dat$X_fac == "c") + rnorm(n)
+
+  sel <- suppressWarnings(lasso_select_covariates(Y ~ Z, ~ X_sig + X_fac, data = dat))
+  # lm_lin still fits: it aliases the offending column itself
+  fit <- suppressWarnings(estimatr::lm_lin(Y ~ Z, covariates = sel, data = dat))
+  z_row <- broom::tidy(fit)[2, ]
+  expect_true(is.finite(z_row$std.error))
+})

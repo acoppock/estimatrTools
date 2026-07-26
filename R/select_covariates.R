@@ -32,6 +32,30 @@
 #' it would in an additive model. Pass \code{lambda_rule = "lambda.min"} for
 #' the cross-validation minimum instead.
 #'
+#' @section Rank deficiency in the interacted design:
+#' LASSO selects against the outcome and knows nothing about the design that
+#' will consume its answer. Under \code{\link{lm_lin_lasso}} every selected
+#' covariate is interacted with every treatment arm, so a set that is fine in a
+#' pooled regression can be rank deficient once crossed with treatment.
+#'
+#' When that happens this function \strong{warns and returns the selection
+#' unchanged}. It does not prune. Pruning would decide, silently and inside the
+#' algorithm, something that belongs in the analysis script where a reader can
+#' see it, and the right remedy is not the same in every case:
+#' \itemize{
+#'   \item \strong{Redundancy}: one covariate lies in the span of another, for
+#'     instance a college indicator derived from an education factor. Dropping
+#'     one of them at the call site is right, and the warning names which.
+#'   \item \strong{Empty cell}: a single factor level is unobserved in one arm,
+#'     so one interaction column is all zero. Dropping the whole covariate to
+#'     fix this is a poor trade, since a factor contributing fourteen columns
+#'     loses thirteen good ones to remove one aliased one. Collapsing the sparse
+#'     level in the cleaning script keeps the rest.
+#' }
+#' Left alone, \code{lm_lin} drops the aliased column itself and still returns
+#' an estimate, so the warning is a prompt to make a decision rather than a
+#' failure.
+#'
 #' @section Unusable candidates:
 #' Candidate columns that are absent from \code{data}, entirely missing, or
 #' constant are dropped before the complete-case filter rather than after.
@@ -85,8 +109,8 @@
 #' @family covariate selection
 #' @export
 lasso_select_covariates <- function(formula, covariates, data,
-                              lambda_rule = c("lambda.1se", "lambda.min"),
-                              seed = 999) {
+                                    lambda_rule = c("lambda.1se", "lambda.min"),
+                                    seed = 999) {
   lambda_rule <- match.arg(lambda_rule)
 
   covariate_cols <- resolve_covariate_names(substitute(covariates), covariates)
@@ -156,7 +180,114 @@ lasso_select_covariates <- function(formula, covariates, data,
   original_cols <- covariate_cols[covariate_cols %in% selected_sources]
 
   if (length(original_cols) == 0) return(~1)
+
+  warn_rank_deficient(original_cols, treatment, df)
+
   stats::reformulate(original_cols)
+}
+
+
+#' Warn when the interacted Lin design is rank deficient, and say why
+#'
+#' Distinguishes the two causes, because they call for different fixes. If
+#' removing a single covariate restores full rank, that covariate is redundant
+#' given the others and dropping it at the call site is the right response; the
+#' narrowest such covariate is suggested, since a derived variable (a college
+#' indicator) contributes fewer columns than the factor it came from. If no
+#' single removal restores rank, the cause is a sparse cell rather than a
+#' redundant covariate, and the empty level-by-arm combinations are named
+#' instead.
+#'
+#' @param cols Selected covariate names.
+#' @param treatment Name of the treatment variable.
+#' @param df The complete-case data frame selection was run on.
+#' @return Nothing; called for the warning.
+#' @keywords internal
+#' @noRd
+warn_rank_deficient <- function(cols, treatment, df) {
+  design <- function(v) {
+    if (length(v) == 0) return(NULL)
+    rhs <- paste(c(treatment, v, paste0(treatment, ":", v)), collapse = " + ")
+    mm <- tryCatch(stats::model.matrix(stats::as.formula(paste("~", rhs)), data = df),
+                   error = function(e) NULL)
+    if (is.null(mm)) return(NULL)
+    mm[stats::complete.cases(mm), , drop = FALSE]
+  }
+
+  mm <- design(cols)
+  if (is.null(mm) || nrow(mm) == 0) return(invisible(NULL))
+  full <- qr(mm)$rank
+  if (full == ncol(mm)) return(invisible(NULL))
+
+  deficiency <- ncol(mm) - full
+
+  header <- sprintf(
+    "lasso_select_covariates: the interacted Lin design is rank deficient (%d columns, rank %d).",
+    ncol(mm), full
+  )
+
+  # Empty cells are checked FIRST. Removing the covariate that contains an
+  # unobserved level always restores rank, so a "does removing it help" test
+  # cannot tell the two causes apart and would report every empty cell as a
+  # redundancy. Look for the empty cell directly instead.
+  empties <- character(0)
+  culprits <- character(0)
+  for (v in cols) {
+    x <- df[[v]]
+    if (is.numeric(x)) next
+    tb <- table(as.character(x), as.character(df[[treatment]]))
+    z0 <- which(tb == 0, arr.ind = TRUE)
+    if (nrow(z0) > 0) {
+      culprits <- c(culprits, v)
+      empties <- c(empties, sprintf('    %s = "%s" has no observations in %s = %s',
+                                    v, rownames(tb)[z0[, 1]], treatment, colnames(tb)[z0[, 2]]))
+    }
+  }
+
+  if (length(empties) > 0) {
+    n_cols <- vapply(culprits, function(v) {
+      m <- tryCatch(stats::model.matrix(stats::reformulate(v), data = df), error = function(e) NULL)
+      if (is.null(m)) NA_integer_ else 2L * (ncol(m) - 1L)
+    }, integer(1))
+    body <- paste0(
+      "  Cause: an unobserved level, not a redundant covariate.\n",
+      paste(empties, collapse = "\n"), "\n",
+      sprintf("  %s contributes %s columns to this design, so dropping it would discard %s to remove %d.\n",
+              paste(culprits, collapse = " and "), paste(n_cols, collapse = "/"),
+              paste(n_cols - deficiency, collapse = "/"), deficiency),
+      "  Collapsing the sparse level in the cleaning script keeps the rest of the covariate."
+    )
+  } else {
+    restorers <- Filter(function(v) {
+      m <- design(setdiff(cols, v))
+      !is.null(m) && nrow(m) > 0 && qr(m)$rank == ncol(m)
+    }, cols)
+
+    if (length(restorers) > 0) {
+      width <- vapply(restorers, function(v) {
+        m <- tryCatch(stats::model.matrix(stats::reformulate(v), data = df), error = function(e) NULL)
+        if (is.null(m)) NA_integer_ else ncol(m) - 1L
+      }, integer(1))
+      suggest <- restorers[which.min(width)]
+      keep <- setdiff(cols, suggest)
+      body <- paste0(
+        "  Cause: redundancy. ", suggest, " lies in the span of the others.\n",
+        "  Exclude it at the call site so the choice is visible in the script:\n",
+        "       covariates = c(", paste0('"', keep, '"', collapse = ", "), ")"
+      )
+    } else {
+      body <- paste0(
+        "  Cause: not attributable to a single covariate or an unobserved level; ",
+        deficiency, " columns are collinear across the set.\n",
+        "  Inspect the design before choosing what to exclude at the call site."
+      )
+    }
+  }
+
+  warning(paste0(header, "\n", body,
+                 "\n  Left as is, lm_lin drops the aliased column and still returns an estimate."),
+          call. = FALSE)
+  invisible(NULL)
 }
 
 

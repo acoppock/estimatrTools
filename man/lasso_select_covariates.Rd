@@ -73,6 +73,32 @@ it would in an additive model. Pass \code{lambda_rule = "lambda.min"} for
 the cross-validation minimum instead.
 }
 
+\section{Rank deficiency in the interacted design}{
+
+LASSO selects against the outcome and knows nothing about the design that
+will consume its answer. Under \code{\link{lm_lin_lasso}} every selected
+covariate is interacted with every treatment arm, so a set that is fine in a
+pooled regression can be rank deficient once crossed with treatment.
+
+When that happens this function \strong{warns and returns the selection
+unchanged}. It does not prune. Pruning would decide, silently and inside the
+algorithm, something that belongs in the analysis script where a reader can
+see it, and the right remedy is not the same in every case:
+\itemize{
+  \item \strong{Redundancy}: one covariate lies in the span of another, for
+    instance a college indicator derived from an education factor. Dropping
+    one of them at the call site is right, and the warning names which.
+  \item \strong{Empty cell}: a single factor level is unobserved in one arm,
+    so one interaction column is all zero. Dropping the whole covariate to
+    fix this is a poor trade, since a factor contributing fourteen columns
+    loses thirteen good ones to remove one aliased one. Collapsing the sparse
+    level in the cleaning script keeps the rest.
+}
+Left alone, \code{lm_lin} drops the aliased column itself and still returns
+an estimate, so the warning is a prompt to make a decision rather than a
+failure.
+}
+
 \section{Unusable candidates}{
 
 Candidate columns that are absent from \code{data}, entirely missing, or
