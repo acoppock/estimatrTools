@@ -26,7 +26,8 @@ Imports:
     broom,
     estimatr,
     glmnet,
-    stats
+    stats,
+    tibble
 Suggests:
     haven,
     knitr,
