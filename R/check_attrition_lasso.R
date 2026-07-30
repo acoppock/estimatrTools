@@ -133,12 +133,26 @@
 #'       falls at or below \code{alpha}.}
 #'   }
 #'
-#' @section When there is no test to run:
-#' \code{estimable} is \code{FALSE} and \code{p_simple} is \code{NA} whenever the
-#' missingness indicator does not vary: nobody dropped out, or everybody did. Such
-#' a row is not a test result, and reporting it as \code{p_value = 1} would put a
-#' spike at 1 into any diagnostic that compares a collection of these p-values
-#' against the uniform distribution they should follow.
+#' @section When there is no p-value, and what that means:
+#' \code{status} records why, because the reasons mean opposite things.
+#' \code{"tested"} is a computed p-value. \code{"no_attrition"} means nobody dropped
+#' out, which is a \strong{pass}: with no attrition there can be no differential
+#' attrition. \code{"all_missing"} means everybody did, which is uninformative.
+#' \code{"not_estimable"} means the indicator varied but no statistic came back.
+#' \code{estimable} equals \code{status == "tested"}.
+#'
+#' The distinction decides a denominator, and the two choices differ by a lot. To
+#' report how much differential attrition a corpus has, count \code{"no_attrition"}
+#' rows as passes and exclude only the uninformative ones. To assess whether the
+#' computed p-values are uniform, as a valid design implies, use \code{"tested"}
+#' rows only, because a row with no attrition produces no draw from Uniform(0, 1) to
+#' compare against. On one real corpus those two rates were 2.5 percent and 7.4
+#' percent, so quoting the second while describing the first overstates the failure
+#' rate roughly threefold.
+#'
+#' Reporting such a row as \code{p_value = 1} makes the mirror error: it puts a spike
+#' at 1 into the uniformity diagnostic, which then reports a badly non-uniform
+#' collection when nothing is wrong.
 #'
 #' @references
 #' Belloni, A., Chernozhukov, V., and Hansen, C. (2014). Inference on treatment
@@ -240,12 +254,19 @@ check_attrition_lasso <- function(data, treatment,
     n_missing  <- sum(miss)
 
     if (length(unique(miss)) < 2L) {
+      # Separate the two ways the indicator can fail to vary, because they mean
+      # opposite things. Nobody missing is a pass: with no attrition there can be no
+      # differential attrition, so the design question is answered in the
+      # affirmative, and counting such a row as a missing test inflates any rate
+      # computed over the rows that remain. Everybody missing is uninformative.
       return(tibble::tibble(
         outcome = yc, n_assigned = n_assigned, n_missing = as.integer(n_missing),
         pct_missing = mean(miss), p_simple = NA_real_,
         n_outcome_eq = 0L, n_dropout_eq = 0L, n_selected = 0L,
         selected_covariates = "", df1 = NA_integer_, epv = NA_real_,
-        epv_adequate = FALSE, p_interacted = NA_real_, estimable = FALSE,
+        epv_adequate = FALSE, p_interacted = NA_real_,
+        status = if (n_missing == 0L) "no_attrition" else "all_missing",
+        estimable = FALSE,
         flag_simple = FALSE, flag_interacted = FALSE, flag = FALSE
       ))
     }
@@ -326,7 +347,8 @@ check_attrition_lasso <- function(data, treatment,
       epv                 = epv,
       epv_adequate        = epv_ok,
       p_interacted        = p_interacted,
-      estimable           = TRUE,
+      status              = if (is.na(p_simple)) "not_estimable" else "tested",
+      estimable           = !is.na(p_simple),
       flag_simple         = flag_s,
       flag_interacted     = flag_i,
       flag                = flag_s || flag_i

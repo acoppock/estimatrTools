@@ -173,13 +173,27 @@ not the denominator degrees of freedom, so no correction repairs it.
 assignment was clustered.
 }
 
-\section{When there is no test to run}{
+\section{When there is no p-value, and what that means}{
 
-\code{estimable} is \code{FALSE} and \code{p_simple} is \code{NA} whenever the
-missingness indicator does not vary: nobody dropped out, or everybody did. Such
-a row is not a test result, and reporting it as \code{p_value = 1} would put a
-spike at 1 into any diagnostic that compares a collection of these p-values
-against the uniform distribution they should follow.
+\code{status} records why, because the reasons mean opposite things.
+\code{"tested"} is a computed p-value. \code{"no_attrition"} means nobody dropped
+out, which is a \strong{pass}: with no attrition there can be no differential
+attrition. \code{"all_missing"} means everybody did, which is uninformative.
+\code{"not_estimable"} means the indicator varied but no statistic came back.
+\code{estimable} equals \code{status == "tested"}.
+
+The distinction decides a denominator, and the two choices differ by a lot. To
+report how much differential attrition a corpus has, count \code{"no_attrition"}
+rows as passes and exclude only the uninformative ones. To assess whether the
+computed p-values are uniform, as a valid design implies, use \code{"tested"}
+rows only, because a row with no attrition produces no draw from Uniform(0, 1) to
+compare against. On one real corpus those two rates were 2.5 percent and 7.4
+percent, so quoting the second while describing the first overstates the failure
+rate roughly threefold.
+
+Reporting such a row as \code{p_value = 1} makes the mirror error: it puts a spike
+at 1 into the uniformity diagnostic, which then reports a badly non-uniform
+collection when nothing is wrong.
 }
 
 \examples{

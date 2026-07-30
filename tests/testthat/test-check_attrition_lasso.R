@@ -220,3 +220,29 @@ test_that("outcomes default to the Y-prefixed columns", {
   out <- check_attrition_lasso(dat, Z, covariates = c("X_age", "X_income"))
   expect_setequal(out$outcome, c("Y_outcome", "Y_extra"))
 })
+
+test_that("status separates a clean outcome from an uninformative one", {
+  dat <- make_attrition_dat()
+  dat$Y_clean <- rnorm(nrow(dat))               # nobody missing: a pass
+  dat$Y_all <- NA_real_                         # everybody missing
+
+  res <- check_attrition_lasso(dat, Z,
+                               outcomes = c("Y_clean", "Y_all", "Y_outcome"),
+                               covariates = c("X_age", "X_income"))
+
+  expect_equal(res$status, c("no_attrition", "all_missing", "tested"))
+  expect_equal(res$estimable, res$status == "tested")
+  expect_equal(res$n_missing[res$outcome == "Y_clean"], 0L)
+})
+
+test_that("a no-attrition row counts as a pass in a prevalence rate", {
+  dat <- make_attrition_dat(differential = TRUE)
+  for (j in 1:4) dat[[paste0("Y_clean", j)]] <- rnorm(nrow(dat))
+
+  res <- check_attrition_lasso(dat, Z, covariates = c("X_age", "X_income"))
+
+  informative <- sum(res$status %in% c("tested", "no_attrition"))
+  expect_equal(informative, 5)
+  # prevalence over informative rows, versus the rate over tested rows alone
+  expect_lt(sum(res$flag) / informative, sum(res$flag) / sum(res$status == "tested"))
+})
