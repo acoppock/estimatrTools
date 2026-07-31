@@ -47,6 +47,14 @@ reference:
   - lm_robust_lasso
   - lm_moderator_lasso
 
+- title: Bootstrap
+  desc: >
+    Refit on resampled rows when the spread across replicates is the standard
+    error you want.
+  contents:
+  - lm_bootstrap
+  - tidy.lm_bootstrap
+
 - title: Attrition
   desc: >
     Whether treatment predicts who is missing, allowing the pattern to differ
